@@ -7,6 +7,11 @@ from .pocketbase import pb_client
 
 # from app.services.openai_service import generate_response
 import re
+from datetime import datetime
+import pytz
+
+# Set timezone for WhatsApp API calls
+WHATSAPP_TIMEZONE = pytz.timezone('Asia/Colombo')  # GTM+5:30
 
 
 def log_http_response(response):
@@ -41,6 +46,10 @@ def send_message(data):
     url = f"https://graph.facebook.com/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/messages"
 
     try:
+        # Add timezone information to the request
+        current_time = datetime.now(WHATSAPP_TIMEZONE)
+        headers["X-WhatsApp-Timezone"] = WHATSAPP_TIMEZONE.zone
+
         response = requests.post(
             url, data=data, headers=headers, timeout=10
         )  # 10 seconds timeout as an example
