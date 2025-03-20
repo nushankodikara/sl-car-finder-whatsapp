@@ -14,7 +14,14 @@ RESPONSES = {
     "greeting": (
         "Hello! 👋 Welcome to the SL Car Finder bot.\n\n"
         "To search for cars, send a message starting with 'find' followed by the car name.\n"
-        "Example: find toyota aqua"
+        "You can filter by price using:\n"
+        "- 'higher than' (e.g., find aqua higher than 5,000,000)\n"
+        "- 'lower than' (e.g., find leaf lower than 6,500,000)\n"
+        "- 'between' (e.g., find civic between 5,000,000 - 8,000,000)\n\n"
+        "Examples:\n"
+        "- find toyota aqua\n"
+        "- find leaf between 3,000,000 - 7,500,000\n"
+        "- find civic higher than 5,000,000"
     ),
     "unknown": "I'm not sure how to respond to that. Send 'hi' for help.",
     "no_search_term": "Please provide what car you're looking for.\nExample: find toyota aqua",

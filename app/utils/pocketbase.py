@@ -7,6 +7,7 @@ import logging
 from datetime import datetime
 from dotenv import load_dotenv
 from pocketbase import PocketBase
+import re
 
 # Load environment variables
 load_dotenv()
@@ -236,6 +237,136 @@ class PocketBaseClient:
             logging.error(f"Error searching vehicles by location: {e}")
             raise
 
+    def parse_price(self, price_str: str) -> int:
+        """
+        Parse price string in various formats to integer.
+        
+        Args:
+            price_str (str): Price string in various formats (e.g., "6,500,000", "Rs.6500000", "65,00,000")
+            
+        Returns:
+            int: Price value
+        """
+        try:
+            # Remove currency symbol and any whitespace
+            price_str = price_str.replace("Rs.", "").replace("Rs", "").strip()
+            
+            # Remove all commas
+            price_str = price_str.replace(",", "")
+            
+            # Convert to integer
+            return int(price_str)
+        except ValueError as e:
+            logging.error(f"Error parsing price {price_str}: {e}")
+            raise ValueError(f"Invalid price format: {price_str}")
+
+    def parse_search_query(self, query: str) -> tuple:
+        """
+        Parse search query to extract title terms and price conditions.
+        
+        Args:
+            query (str): Full search query
+            
+        Returns:
+            tuple: (search_terms, min_price, max_price)
+        """
+        query = query.lower().strip()
+        min_price = None
+        max_price = None
+        
+        # Split query into words
+        words = query.split()
+        if not words:
+            return [], None, None
+            
+        # Initialize search terms with all words
+        search_terms = words.copy()
+        
+        # Find price conditions
+        i = 0
+        while i < len(words):
+            # Handle "higher/lower than" format
+            if i < len(words) - 2 and words[i] in ["higher", "lower"] and words[i + 1] == "than":
+                try:
+                    price_value = self.parse_price(words[i + 2])
+                    # Remove these terms from search_terms
+                    for term in words[i:i + 3]:
+                        if term in search_terms:
+                            search_terms.remove(term)
+                    
+                    if words[i] == "higher":
+                        min_price = price_value
+                    else:
+                        max_price = price_value
+                    
+                    i += 3  # Skip the processed terms
+                    continue
+                except ValueError:
+                    pass
+            
+            # Handle "between X - Y" format
+            elif i < len(words) - 1 and words[i] == "between":
+                try:
+                    # Join remaining words to handle various dash formats
+                    remaining_text = " ".join(words[i+1:])
+                    logging.info(f"Processing price range text: {remaining_text}")
+                    
+                    # Try to find numbers directly connected by a dash first
+                    direct_pattern = re.compile(r'(\d[\d,\.]*)-(\d[\d,\.]*)')
+                    match = direct_pattern.search(remaining_text)
+                    
+                    if match:
+                        logging.info(f"Found direct match: {match.groups()}")
+                        min_price = self.parse_price(match.group(1))
+                        max_price = self.parse_price(match.group(2))
+                    else:
+                        # If no direct match, try the spaced pattern
+                        spaced_pattern = re.compile(r'((?:rs\.?)?\s*\d[\d,\.]*)\s*-\s*((?:rs\.?)?\s*\d[\d,\.]*)', re.IGNORECASE)
+                        match = spaced_pattern.search(remaining_text)
+                        if match:
+                            logging.info(f"Found spaced match: {match.groups()}")
+                            min_price = self.parse_price(match.group(1))
+                            max_price = self.parse_price(match.group(2))
+                        else:
+                            # If both patterns fail, try simple split
+                            if "-" in remaining_text:
+                                parts = remaining_text.split("-", 1)
+                                if len(parts) == 2:
+                                    logging.info(f"Using simple split: {parts}")
+                                    min_price = self.parse_price(parts[0])
+                                    max_price = self.parse_price(parts[1])
+                    
+                    if min_price is not None and max_price is not None:
+                        logging.info(f"Successfully parsed price range: {min_price} - {max_price}")
+                        # Remove all price-related terms
+                        terms_to_remove = words[i:]  # Remove 'between' and everything after
+                        for term in terms_to_remove:
+                            if term in search_terms:
+                                search_terms.remove(term)
+                        
+                        i = len(words)  # Skip to end since we've processed the price range
+                        continue
+                    
+                    # If we couldn't parse prices, move to next word
+                    i += 1
+                    continue
+                        
+                except (ValueError, IndexError) as e:
+                    logging.error(f"Error parsing price range: {e}")
+                    # If price parsing fails, move to next word
+                    i += 1
+                    continue
+            else:
+                i += 1
+        
+        # Remove "find" from search terms if present
+        search_terms = [w for w in search_terms if w != "find"]
+        
+        # Log the parsed results for debugging
+        logging.info(f"Parsed search query: terms={search_terms}, min_price={min_price}, max_price={max_price}")
+        
+        return search_terms, min_price, max_price
+
     def search_vehicles_by_title(self, title: str, page: int = 1) -> Dict:
         """
         Search for vehicles by title and return latest 5 matches.
@@ -252,16 +383,24 @@ class PocketBaseClient:
             self._authenticate()
             
         try:
-            # Split the search terms and create filter conditions
-            search_terms = title.lower().split()
+            # Parse search query
+            search_terms, min_price, max_price = self.parse_search_query(title)
             filter_conditions = []
             
-            # Create a condition for each search term
+            # Add title conditions
             for term in search_terms:
                 filter_conditions.append(f'title ~ "{term}"')
             
+            # Add price conditions
+            if min_price is not None:
+                filter_conditions.append(f'pricing >= {min_price}')
+            if max_price is not None:
+                filter_conditions.append(f'pricing <= {max_price}')
+            
             # Combine all conditions with AND operator
             filter_str = " && ".join(filter_conditions)
+            
+            logging.info(f"Search filter: {filter_str}")
             
             # Using the correct parameter names as per documentation
             results = self.client.collection('vehicle_listings').get_list(
