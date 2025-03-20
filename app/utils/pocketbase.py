@@ -252,12 +252,23 @@ class PocketBaseClient:
             self._authenticate()
             
         try:
+            # Split the search terms and create filter conditions
+            search_terms = title.lower().split()
+            filter_conditions = []
+            
+            # Create a condition for each search term
+            for term in search_terms:
+                filter_conditions.append(f'title ~ "{term}"')
+            
+            # Combine all conditions with AND operator
+            filter_str = " && ".join(filter_conditions)
+            
             # Using the correct parameter names as per documentation
             results = self.client.collection('vehicle_listings').get_list(
                 page,  # page number
                 5,    # per_page (items per page)
                 {
-                    "filter": f'title ~ "{title}"',
+                    "filter": filter_str,
                     "sort": "-posted_date"
                 }
             )
