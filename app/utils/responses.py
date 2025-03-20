@@ -3,6 +3,7 @@ This module contains response templates and message handling logic for the Whats
 """
 from .pocketbase import pb_client
 import logging
+from .query_parser import TokenType
 
 # Dictionary of greeting messages and their variations
 GREETING_MESSAGES = {
@@ -13,15 +14,29 @@ GREETING_MESSAGES = {
 RESPONSES = {
     "greeting": (
         "Hello! 👋 Welcome to the SL Car Finder bot.\n\n"
-        "To search for cars, send a message starting with 'find' followed by the car name.\n"
-        "You can filter by price using:\n"
-        "- 'higher than' (e.g., find aqua higher than 5,000,000)\n"
-        "- 'lower than' (e.g., find leaf lower than 6,500,000)\n"
-        "- 'between' (e.g., find civic between 5,000,000 - 8,000,000)\n\n"
-        "Examples:\n"
+        "I can help you find cars using natural language queries. Just tell me what you're looking for!\n\n"
+        "🔍 Basic Search:\n"
         "- find toyota aqua\n"
-        "- find leaf between 3,000,000 - 7,500,000\n"
-        "- find civic higher than 5,000,000"
+        "- find honda civic\n"
+        "- find bmw\n\n"
+        "💰 Price Filters:\n"
+        "- find aqua higher than 5,000,000\n"
+        "- find civic lower than 8,000,000\n"
+        "- find prius between 6,000,000 - 9,000,000\n\n"
+        "🚗 Car Condition:\n"
+        "- find new toyota prius\n"
+        "- find used honda fit\n"
+        "- find second hand aqua\n\n"
+        "🔄 Combined Filters:\n"
+        "- find new toyota aqua between 5,000,000 - 8,000,000\n"
+        "- find used honda civic higher than 7,000,000\n"
+        "- find prius lower than 6,500,000\n\n"
+        "💡 Tips:\n"
+        "- Start your query with 'find'\n"
+        "- Use natural language (e.g., 'higher than', 'lower than', 'between')\n"
+        "- Combine multiple conditions in one query\n"
+        "- Send 'next' to see more results\n\n"
+        "Try any of these examples or create your own query!"
     ),
     "unknown": "I'm not sure how to respond to that. Send 'hi' for help.",
     "no_search_term": "Please provide what car you're looking for.\nExample: find toyota aqua",

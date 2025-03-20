@@ -8,6 +8,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from pocketbase import PocketBase
 import re
+from .query_parser import parse_search_query
 
 # Load environment variables
 load_dotenv()
@@ -383,24 +384,9 @@ class PocketBaseClient:
             self._authenticate()
             
         try:
-            # Parse search query
-            search_terms, min_price, max_price = self.parse_search_query(title)
-            filter_conditions = []
-            
-            # Add title conditions
-            for term in search_terms:
-                filter_conditions.append(f'title ~ "{term}"')
-            
-            # Add price conditions
-            if min_price is not None:
-                filter_conditions.append(f'pricing >= {min_price}')
-            if max_price is not None:
-                filter_conditions.append(f'pricing <= {max_price}')
-            
-            # Combine all conditions with AND operator
-            filter_str = " && ".join(filter_conditions)
-            
-            logging.info(f"Search filter: {filter_str}")
+            # Parse the search query using our new parser
+            filter_str = parse_search_query(title)
+            logging.info(f"Generated filter string: {filter_str}")
             
             # Using the correct parameter names as per documentation
             results = self.client.collection('vehicle_listings').get_list(
